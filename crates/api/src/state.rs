@@ -21,9 +21,11 @@ pub struct AppState {
     pub advisor: AdvisorService,
     pub auth: AuthRegistry,
 
-    /// Recent transactions per source account, used to build `RuleContext`
-    /// for later evaluations. Bounded per account to avoid unbounded
-    /// growth in this reference (in-memory) implementation.
+    /// Recent transactions per account, indexed under both the source and
+    /// destination account so rules that need bidirectional context (e.g.
+    /// round-trip / wash-trading detection) can see money flowing both in
+    /// and out of an account, not just out. Bounded per account to avoid
+    /// unbounded growth in this reference (in-memory) implementation.
     pub tx_history: RwLock<HashMap<String, Vec<NormalizedTransaction>>>,
     /// All ingested transactions keyed by hash, for lookup/evaluate-by-hash
     /// endpoints.
@@ -41,7 +43,17 @@ impl AppState {
     pub fn record_transaction(&self, tx: NormalizedTransaction) {
         self.transactions.write().unwrap().insert(tx.tx_hash.clone(), tx.clone());
         let mut history = self.tx_history.write().unwrap();
-        let entry = history.entry(tx.source_account.clone()).or_default();
+
+        Self::push_bounded(&mut history, tx.source_account.clone(), tx.clone());
+        if let Some(dest) = tx.destination_account.clone() {
+            if dest != tx.source_account {
+                Self::push_bounded(&mut history, dest, tx);
+            }
+        }
+    }
+
+    fn push_bounded(history: &mut HashMap<String, Vec<NormalizedTransaction>>, account: String, tx: NormalizedTransaction) {
+        let entry = history.entry(account).or_default();
         entry.push(tx);
         if entry.len() > MAX_HISTORY_PER_ACCOUNT {
             let excess = entry.len() - MAX_HISTORY_PER_ACCOUNT;
