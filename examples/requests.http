@@ -1,0 +1,73 @@
+### StellarTrace example requests.
+### Compatible with the VS Code "REST Client" extension and JetBrains'
+### built-in HTTP client. Run `cargo run -p stellartrace-api` first.
+
+@baseUrl = http://localhost:8080
+@investigatorToken = dev-investigator-token
+
+### Health check
+GET {{baseUrl}}/health
+
+### Metrics
+GET {{baseUrl}}/metrics
+
+### Ingest a transaction and evaluate it against the rules engine.
+# A large transfer — expect `large_transfer` (and possibly
+# `new_account_high_value_outflow`) to trigger and an alert to be created.
+POST {{baseUrl}}/api/transactions
+Content-Type: application/json
+
+{
+  "tx_hash": "example-large-transfer",
+  "ledger_sequence": 100,
+  "source_account": "GALICE000000000000000000000000000000000000000000000000",
+  "destination_account": "GBOB0000000000000000000000000000000000000000000000000",
+  "asset": { "type": "native" },
+  "amount": "50000",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "is_soroban_invocation": false,
+  "contract_id": null,
+  "metadata": {}
+}
+
+### Retrieve the ingested transaction.
+GET {{baseUrl}}/api/transactions/example-large-transfer
+
+### List all alerts.
+GET {{baseUrl}}/api/alerts
+
+### List only open alerts.
+GET {{baseUrl}}/api/alerts?status=open
+
+### Get one alert (replace :alertId with an id from the list above).
+GET {{baseUrl}}/api/alerts/:alertId
+
+### Get the AI advisory investigation for an alert. Response is always
+### labeled advisory-only and can never change the alert's status.
+GET {{baseUrl}}/api/alerts/:alertId/ai-investigation
+
+### Attempt a decision with no token — expect 401 Unauthorized.
+POST {{baseUrl}}/api/alerts/:alertId/decision
+Content-Type: application/json
+
+{
+  "decision": "dismissed",
+  "notes": "should be rejected: no auth"
+}
+
+### Submit the final human decision — the only thing that can change
+### alert status.
+POST {{baseUrl}}/api/alerts/:alertId/decision
+Content-Type: application/json
+Authorization: Bearer {{investigatorToken}}
+
+{
+  "decision": "confirmed_suspicious",
+  "notes": "Verified with off-chain KYC records; funds traced to known mixer."
+}
+
+### Full audit trail for the alert.
+GET {{baseUrl}}/api/alerts/:alertId/audit
+
+### Verify the audit chain's integrity.
+GET {{baseUrl}}/api/audit/verify
