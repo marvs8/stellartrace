@@ -16,6 +16,10 @@ pub fn default_rule_set() -> Vec<Box<dyn Rule>> {
         Box::new(FlaggedAccountInteractionRule),
         Box::new(UnusualAssetMovementRule),
         Box::new(ConfigurableThresholdRule),
+        Box::new(DormantAccountReactivationRule),
+        Box::new(RoundTripWashTradingRule),
+        Box::new(NewAccountHighValueOutflowRule),
+        Box::new(CrossAssetRapidConversionRule),
     ]
 }
 
@@ -283,6 +287,194 @@ impl Rule for ConfigurableThresholdRule {
     }
 }
 
+/// Flags a transaction from an account that had no activity for an
+/// extended gap and then suddenly moves a significant amount — a pattern
+/// consistent with a compromised, sold, or otherwise hijacked dormant
+/// account being drained.
+pub struct DormantAccountReactivationRule;
+impl Rule for DormantAccountReactivationRule {
+    fn id(&self) -> &'static str {
+        "dormant_account_reactivation"
+    }
+
+    fn evaluate(
+        &self,
+        tx: &NormalizedTransaction,
+        ctx: &RuleContext,
+        config: &RulesConfig,
+    ) -> Option<TriggeredRule> {
+        if tx.amount_f64() < config.dormant_reactivation_min_amount {
+            return None;
+        }
+
+        let last_prior = ctx
+            .account_history
+            .iter()
+            .filter(|h| h.source_account == tx.source_account && h.timestamp < tx.timestamp)
+            .max_by_key(|h| h.timestamp)?;
+
+        let gap_secs = (tx.timestamp - last_prior.timestamp).num_seconds();
+        if gap_secs >= config.dormant_reactivation_gap_secs {
+            let mut evidence = HashMap::new();
+            evidence.insert("gap_secs".into(), gap_secs.to_string());
+            evidence.insert("gap_threshold_secs".into(), config.dormant_reactivation_gap_secs.to_string());
+            evidence.insert("amount".into(), tx.amount.clone());
+            evidence.insert("min_amount_threshold".into(), config.dormant_reactivation_min_amount.to_string());
+            evidence.insert("last_prior_tx_hash".into(), last_prior.tx_hash.clone());
+            Some(TriggeredRule {
+                rule_id: self.id().into(),
+                rule_name: "Dormant Account Reactivation".into(),
+                severity: Severity::High,
+                reason: format!(
+                    "Account was inactive for {} seconds (threshold: {}) before this {} {} transaction",
+                    gap_secs, config.dormant_reactivation_gap_secs, tx.amount, tx.asset
+                ),
+                evidence,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// Flags a transaction that completes a round trip: the current
+/// destination account previously sent funds back to the current source
+/// account within a short window, a pattern associated with wash trading
+/// or artificially inflating transaction volume.
+pub struct RoundTripWashTradingRule;
+impl Rule for RoundTripWashTradingRule {
+    fn id(&self) -> &'static str {
+        "round_trip_wash_trading"
+    }
+
+    fn evaluate(
+        &self,
+        tx: &NormalizedTransaction,
+        ctx: &RuleContext,
+        config: &RulesConfig,
+    ) -> Option<TriggeredRule> {
+        let destination = tx.destination_account.as_ref()?;
+
+        let window = ctx.within_window(tx.timestamp, config.wash_trading_window_secs);
+        let round_trip = window.iter().find(|h| {
+            &h.source_account == destination
+                && h.destination_account.as_deref() == Some(tx.source_account.as_str())
+                && h.timestamp < tx.timestamp
+        });
+
+        if let Some(prior) = round_trip {
+            let mut evidence = HashMap::new();
+            evidence.insert("window_secs".into(), config.wash_trading_window_secs.to_string());
+            evidence.insert("return_leg_tx_hash".into(), prior.tx_hash.clone());
+            evidence.insert("return_leg_amount".into(), prior.amount.clone());
+            evidence.insert("outbound_amount".into(), tx.amount.clone());
+            Some(TriggeredRule {
+                rule_id: self.id().into(),
+                rule_name: "Round-Trip Wash Trading".into(),
+                severity: Severity::High,
+                reason: format!(
+                    "Funds round-tripped between {} and {} within {} seconds",
+                    tx.source_account, destination, config.wash_trading_window_secs
+                ),
+                evidence,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// Flags a high-value outflow from an account with little to no prior
+/// sending history — common in account-takeover or mule-account drains
+/// where the account is used once immediately after being compromised.
+pub struct NewAccountHighValueOutflowRule;
+impl Rule for NewAccountHighValueOutflowRule {
+    fn id(&self) -> &'static str {
+        "new_account_high_value_outflow"
+    }
+
+    fn evaluate(
+        &self,
+        tx: &NormalizedTransaction,
+        ctx: &RuleContext,
+        config: &RulesConfig,
+    ) -> Option<TriggeredRule> {
+        if tx.destination_account.is_none() {
+            return None;
+        }
+        if tx.amount_f64() < config.new_account_outflow_threshold {
+            return None;
+        }
+
+        let outgoing_count = ctx
+            .account_history
+            .iter()
+            .filter(|h| h.source_account == tx.source_account && h.timestamp < tx.timestamp)
+            .count();
+
+        if outgoing_count <= config.new_account_history_threshold {
+            let mut evidence = HashMap::new();
+            evidence.insert("prior_outgoing_count".into(), outgoing_count.to_string());
+            evidence.insert("history_threshold".into(), config.new_account_history_threshold.to_string());
+            evidence.insert("amount".into(), tx.amount.clone());
+            evidence.insert("amount_threshold".into(), config.new_account_outflow_threshold.to_string());
+            Some(TriggeredRule {
+                rule_id: self.id().into(),
+                rule_name: "New Account High-Value Outflow".into(),
+                severity: Severity::Medium,
+                reason: format!(
+                    "Account has only {} prior outgoing transaction(s) (threshold: {}) but is sending {} {}",
+                    outgoing_count, config.new_account_history_threshold, tx.amount, tx.asset
+                ),
+                evidence,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// Flags an account moving through several distinct assets in rapid
+/// succession — a layering pattern often used to obscure the origin of
+/// funds before a final cash-out.
+pub struct CrossAssetRapidConversionRule;
+impl Rule for CrossAssetRapidConversionRule {
+    fn id(&self) -> &'static str {
+        "cross_asset_rapid_conversion"
+    }
+
+    fn evaluate(
+        &self,
+        tx: &NormalizedTransaction,
+        ctx: &RuleContext,
+        config: &RulesConfig,
+    ) -> Option<TriggeredRule> {
+        let window = ctx.within_window(tx.timestamp, config.cross_asset_conversion_window_secs);
+        let mut distinct_assets: std::collections::HashSet<&stellartrace_common::Asset> =
+            window.iter().map(|h| &h.asset).collect();
+        distinct_assets.insert(&tx.asset);
+
+        if distinct_assets.len() >= config.cross_asset_conversion_count_threshold {
+            let mut evidence = HashMap::new();
+            evidence.insert("distinct_asset_count".into(), distinct_assets.len().to_string());
+            evidence.insert("count_threshold".into(), config.cross_asset_conversion_count_threshold.to_string());
+            evidence.insert("window_secs".into(), config.cross_asset_conversion_window_secs.to_string());
+            Some(TriggeredRule {
+                rule_id: self.id().into(),
+                rule_name: "Cross-Asset Rapid Conversion".into(),
+                severity: Severity::Medium,
+                reason: format!(
+                    "Account touched {} distinct assets within {} seconds (threshold: {}), consistent with layering",
+                    distinct_assets.len(), config.cross_asset_conversion_window_secs, config.cross_asset_conversion_count_threshold
+                ),
+                evidence,
+            })
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,12 +483,22 @@ mod tests {
     use stellartrace_common::Asset;
 
     fn tx(amount: &str, ts_offset_secs: i64, dest: Option<&str>) -> NormalizedTransaction {
+        tx_from("GALICE", amount, ts_offset_secs, dest, Asset::Native)
+    }
+
+    fn tx_from(
+        source: &str,
+        amount: &str,
+        ts_offset_secs: i64,
+        dest: Option<&str>,
+        asset: Asset,
+    ) -> NormalizedTransaction {
         NormalizedTransaction {
-            tx_hash: "h".into(),
+            tx_hash: format!("h-{source}-{ts_offset_secs}"),
             ledger_sequence: 1,
-            source_account: "GALICE".into(),
+            source_account: source.into(),
             destination_account: dest.map(|s| s.to_string()),
-            asset: Asset::Native,
+            asset,
             amount: amount.into(),
             timestamp: Utc::now() + Duration::seconds(ts_offset_secs),
             is_soroban_invocation: false,
@@ -391,6 +593,106 @@ mod tests {
         let ctx = RuleContext::default();
         let result = rule.evaluate(&current, &ctx, &config).unwrap();
         assert!(result.rule_name.contains("max_single_asset_exposure"));
+    }
+
+    #[test]
+    fn dormant_reactivation_fires_after_long_gap() {
+        let rule = DormantAccountReactivationRule;
+        let config = RulesConfig::default();
+        // last activity ~40 days ago, well beyond the 30-day default gap
+        let history = vec![tx_from("GALICE", "10", -(40 * 24 * 60 * 60), Some("GBOB"), Asset::Native)];
+        let ctx = RuleContext::new(history, HashSet::new());
+        let current = tx_from("GALICE", "5000", 0, Some("GBOB"), Asset::Native);
+        let result = rule.evaluate(&current, &ctx, &config).unwrap();
+        assert_eq!(result.rule_id, "dormant_account_reactivation");
+    }
+
+    #[test]
+    fn dormant_reactivation_silent_with_recent_activity() {
+        let rule = DormantAccountReactivationRule;
+        let config = RulesConfig::default();
+        let history = vec![tx_from("GALICE", "10", -60, Some("GBOB"), Asset::Native)];
+        let ctx = RuleContext::new(history, HashSet::new());
+        let current = tx_from("GALICE", "5000", 0, Some("GBOB"), Asset::Native);
+        assert!(rule.evaluate(&current, &ctx, &config).is_none());
+    }
+
+    #[test]
+    fn dormant_reactivation_silent_with_no_history() {
+        let rule = DormantAccountReactivationRule;
+        let config = RulesConfig::default();
+        let ctx = RuleContext::default();
+        let current = tx_from("GALICE", "5000", 0, Some("GBOB"), Asset::Native);
+        assert!(rule.evaluate(&current, &ctx, &config).is_none());
+    }
+
+    #[test]
+    fn round_trip_wash_trading_detects_return_leg() {
+        let rule = RoundTripWashTradingRule;
+        let config = RulesConfig::default();
+        // GBOB sent to GALICE 10 minutes ago; now GALICE sends to GBOB.
+        let history = vec![tx_from("GBOB", "100", -600, Some("GALICE"), Asset::Native)];
+        let ctx = RuleContext::new(history, HashSet::new());
+        let current = tx_from("GALICE", "100", 0, Some("GBOB"), Asset::Native);
+        let result = rule.evaluate(&current, &ctx, &config).unwrap();
+        assert_eq!(result.rule_id, "round_trip_wash_trading");
+    }
+
+    #[test]
+    fn round_trip_wash_trading_silent_without_return_leg() {
+        let rule = RoundTripWashTradingRule;
+        let config = RulesConfig::default();
+        let ctx = RuleContext::default();
+        let current = tx_from("GALICE", "100", 0, Some("GBOB"), Asset::Native);
+        assert!(rule.evaluate(&current, &ctx, &config).is_none());
+    }
+
+    #[test]
+    fn new_account_high_value_outflow_fires_with_little_history() {
+        let rule = NewAccountHighValueOutflowRule;
+        let config = RulesConfig::default();
+        let ctx = RuleContext::default();
+        let current = tx_from("GNEWACCOUNT", "6000", 0, Some("GBOB"), Asset::Native);
+        let result = rule.evaluate(&current, &ctx, &config).unwrap();
+        assert_eq!(result.rule_id, "new_account_high_value_outflow");
+    }
+
+    #[test]
+    fn new_account_high_value_outflow_silent_with_established_history() {
+        let rule = NewAccountHighValueOutflowRule;
+        let config = RulesConfig::default();
+        let history = vec![
+            tx_from("GALICE", "10", -1000, Some("GBOB"), Asset::Native),
+            tx_from("GALICE", "10", -2000, Some("GBOB"), Asset::Native),
+            tx_from("GALICE", "10", -3000, Some("GBOB"), Asset::Native),
+        ];
+        let ctx = RuleContext::new(history, HashSet::new());
+        let current = tx_from("GALICE", "6000", 0, Some("GBOB"), Asset::Native);
+        assert!(rule.evaluate(&current, &ctx, &config).is_none());
+    }
+
+    #[test]
+    fn cross_asset_rapid_conversion_fires_across_distinct_assets() {
+        let rule = CrossAssetRapidConversionRule;
+        let config = RulesConfig::default();
+        let history = vec![
+            tx_from("GALICE", "10", -100, Some("GBOB"), Asset::Credit { code: "USDC".into(), issuer: "GISSUER1".into() }),
+            tx_from("GALICE", "10", -200, Some("GBOB"), Asset::Credit { code: "EURC".into(), issuer: "GISSUER2".into() }),
+        ];
+        let ctx = RuleContext::new(history, HashSet::new());
+        let current = tx_from("GALICE", "10", 0, Some("GBOB"), Asset::Native);
+        let result = rule.evaluate(&current, &ctx, &config).unwrap();
+        assert_eq!(result.rule_id, "cross_asset_rapid_conversion");
+    }
+
+    #[test]
+    fn cross_asset_rapid_conversion_silent_with_single_asset() {
+        let rule = CrossAssetRapidConversionRule;
+        let config = RulesConfig::default();
+        let history = vec![tx_from("GALICE", "10", -100, Some("GBOB"), Asset::Native)];
+        let ctx = RuleContext::new(history, HashSet::new());
+        let current = tx_from("GALICE", "10", 0, Some("GBOB"), Asset::Native);
+        assert!(rule.evaluate(&current, &ctx, &config).is_none());
     }
 
     #[test]
