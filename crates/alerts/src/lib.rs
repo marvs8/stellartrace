@@ -24,7 +24,10 @@ pub enum AlertError {
     #[error("alert not found: {0}")]
     NotFound(Uuid),
     #[error("invalid status transition from {from:?} to {to:?}")]
-    InvalidTransition { from: InvestigationStatus, to: InvestigationStatus },
+    InvalidTransition {
+        from: InvestigationStatus,
+        to: InvestigationStatus,
+    },
 }
 
 /// In-memory alert store. A production deployment would back this with a
@@ -37,7 +40,10 @@ pub struct AlertManager {
 
 impl AlertManager {
     pub fn new(audit: std::sync::Arc<AuditLog>) -> Self {
-        Self { alerts: RwLock::new(HashMap::new()), audit }
+        Self {
+            alerts: RwLock::new(HashMap::new()),
+            audit,
+        }
     }
 
     /// Creates a new alert from a flagged transaction. Only called when
@@ -66,7 +72,10 @@ impl AlertManager {
             updated_at: now,
         };
 
-        self.alerts.write().unwrap().insert(alert.alert_id, alert.clone());
+        self.alerts
+            .write()
+            .unwrap()
+            .insert(alert.alert_id, alert.clone());
 
         self.audit.append(
             alert.alert_id,
@@ -101,12 +110,15 @@ impl AlertManager {
 
     pub fn list(&self) -> Vec<Alert> {
         let mut alerts: Vec<Alert> = self.alerts.read().unwrap().values().cloned().collect();
-        alerts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        alerts.sort_by_key(|a| std::cmp::Reverse(a.created_at));
         alerts
     }
 
     pub fn list_by_status(&self, status: InvestigationStatus) -> Vec<Alert> {
-        self.list().into_iter().filter(|a| a.status == status).collect()
+        self.list()
+            .into_iter()
+            .filter(|a| a.status == status)
+            .collect()
     }
 
     /// Seeds the store with previously-persisted alerts, e.g. restored
@@ -126,7 +138,11 @@ impl AlertManager {
     /// by a human (e.g. new evidence reopens a dismissed alert) — the
     /// audit trail preserves the fact that it changed, which is what
     /// matters for this domain, rather than forbidding correction.
-    fn validate_transition(&self, _from: InvestigationStatus, _to: InvestigationStatus) -> Result<(), AlertError> {
+    fn validate_transition(
+        &self,
+        _from: InvestigationStatus,
+        _to: InvestigationStatus,
+    ) -> Result<(), AlertError> {
         Ok(())
     }
 
@@ -164,7 +180,10 @@ impl AlertManager {
         self.audit.append(
             decision.alert_id,
             updated.tx_hash.clone(),
-            AuditEventKind::StatusChanged { from: format!("{from:?}"), to: format!("{:?}", decision.decision) },
+            AuditEventKind::StatusChanged {
+                from: format!("{from:?}"),
+                to: format!("{:?}", decision.decision),
+            },
         );
 
         tracing::info!(
@@ -210,7 +229,10 @@ mod tests {
         let mgr = manager();
         let alert = mgr.create_alert(&sample_tx(), vec![], 10.0, Severity::Low);
         assert_eq!(alert.status, InvestigationStatus::Open);
-        assert_eq!(mgr.get(alert.alert_id).unwrap().status, InvestigationStatus::Open);
+        assert_eq!(
+            mgr.get(alert.alert_id).unwrap().status,
+            InvestigationStatus::Open
+        );
     }
 
     #[test]
@@ -239,7 +261,10 @@ mod tests {
             notes: "".into(),
             decided_at: chrono::Utc::now(),
         };
-        assert!(matches!(mgr.apply_investigator_decision(decision), Err(AlertError::NotFound(_))));
+        assert!(matches!(
+            mgr.apply_investigator_decision(decision),
+            Err(AlertError::NotFound(_))
+        ));
     }
 
     #[test]
@@ -251,7 +276,10 @@ mod tests {
         let fresh_mgr = AlertManager::new(Arc::new(AuditLog::new()));
         fresh_mgr.restore(vec![alert.clone()]);
 
-        assert_eq!(fresh_mgr.get(alert.alert_id).unwrap().status, InvestigationStatus::Escalated);
+        assert_eq!(
+            fresh_mgr.get(alert.alert_id).unwrap().status,
+            InvestigationStatus::Escalated
+        );
         assert!(fresh_mgr.audit.for_alert(alert.alert_id).is_empty());
     }
 
@@ -266,7 +294,8 @@ mod tests {
             decision: InvestigationStatus::UnderInvestigation,
             notes: "initial look".into(),
             decided_at: chrono::Utc::now(),
-        }).unwrap();
+        })
+        .unwrap();
 
         mgr.apply_investigator_decision(InvestigatorDecision {
             alert_id: alert.alert_id,
@@ -274,13 +303,17 @@ mod tests {
             decision: InvestigationStatus::ConfirmedSuspicious,
             notes: "confirmed via off-chain KYC lookup".into(),
             decided_at: chrono::Utc::now(),
-        }).unwrap();
+        })
+        .unwrap();
 
         let history = mgr.audit.for_alert(alert.alert_id);
         let decision_events = history
             .iter()
             .filter(|r| matches!(r.event, AuditEventKind::InvestigatorDecision { .. }))
             .count();
-        assert_eq!(decision_events, 2, "both decisions must remain in the audit trail");
+        assert_eq!(
+            decision_events, 2,
+            "both decisions must remain in the audit trail"
+        );
     }
 }

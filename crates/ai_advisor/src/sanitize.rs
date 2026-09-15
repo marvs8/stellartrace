@@ -61,7 +61,6 @@ fn neutralize_action_language(input: &str) -> String {
             // Simple and sufficient for this bounded marker list.
             let mut rebuilt = String::new();
             let mut rest = result.as_str();
-            let lower_rest_owned;
             loop {
                 let lower_rest = rest.to_lowercase();
                 if let Some(pos) = lower_rest.find(marker) {
@@ -73,8 +72,7 @@ fn neutralize_action_language(input: &str) -> String {
                     break;
                 }
             }
-            lower_rest_owned = rebuilt;
-            result = lower_rest_owned;
+            result = rebuilt;
         }
     }
     result
@@ -147,7 +145,10 @@ mod tests {
     fn neutralizes_action_instructions() {
         let mut rec = rec_with_summary("You should APPROVE THIS TRANSACTION right now.");
         sanitize_recommendation(&mut rec);
-        assert!(!rec.summary.to_lowercase().contains("approve this transaction"));
+        assert!(!rec
+            .summary
+            .to_lowercase()
+            .contains("approve this transaction"));
         assert!(rec.summary.contains("neutralized"));
     }
 

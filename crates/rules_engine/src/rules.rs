@@ -41,7 +41,10 @@ impl Rule for LargeTransferRule {
         if amount > config.large_transfer_threshold {
             let mut evidence = HashMap::new();
             evidence.insert("amount".into(), tx.amount.clone());
-            evidence.insert("threshold".into(), config.large_transfer_threshold.to_string());
+            evidence.insert(
+                "threshold".into(),
+                config.large_transfer_threshold.to_string(),
+            );
             evidence.insert("asset".into(), tx.asset.to_string());
             Some(TriggeredRule {
                 rule_id: self.id().into(),
@@ -88,8 +91,14 @@ impl Rule for RepeatedTransactionRule {
         if matching >= config.repeated_tx_count_threshold {
             let mut evidence = HashMap::new();
             evidence.insert("count".into(), matching.to_string());
-            evidence.insert("threshold".into(), config.repeated_tx_count_threshold.to_string());
-            evidence.insert("window_secs".into(), config.repeated_tx_window_secs.to_string());
+            evidence.insert(
+                "threshold".into(),
+                config.repeated_tx_count_threshold.to_string(),
+            );
+            evidence.insert(
+                "window_secs".into(),
+                config.repeated_tx_window_secs.to_string(),
+            );
             if let Some(dest) = &tx.destination_account {
                 evidence.insert("destination_account".into(), dest.clone());
             }
@@ -129,15 +138,24 @@ impl Rule for AbnormalFrequencyRule {
         if count >= config.frequency_count_threshold {
             let mut evidence = HashMap::new();
             evidence.insert("count".into(), count.to_string());
-            evidence.insert("threshold".into(), config.frequency_count_threshold.to_string());
-            evidence.insert("window_secs".into(), config.frequency_window_secs.to_string());
+            evidence.insert(
+                "threshold".into(),
+                config.frequency_count_threshold.to_string(),
+            );
+            evidence.insert(
+                "window_secs".into(),
+                config.frequency_window_secs.to_string(),
+            );
             Some(TriggeredRule {
                 rule_id: self.id().into(),
                 rule_name: "Abnormal Transaction Frequency".into(),
                 severity: Severity::Medium,
                 reason: format!(
                     "Account {} made {} transactions within {} seconds (threshold: {})",
-                    tx.source_account, count, config.frequency_window_secs, config.frequency_count_threshold
+                    tx.source_account,
+                    count,
+                    config.frequency_window_secs,
+                    config.frequency_count_threshold
                 ),
                 evidence,
             })
@@ -183,7 +201,11 @@ impl Rule for FlaggedAccountInteractionRule {
                 severity: Severity::High,
                 reason: format!(
                     "Transaction involves a previously flagged account ({})",
-                    if source_flagged { "source" } else { "destination" }
+                    if source_flagged {
+                        "source"
+                    } else {
+                        "destination"
+                    }
                 ),
                 evidence,
             })
@@ -231,7 +253,10 @@ impl Rule for UnusualAssetMovementRule {
             evidence.insert("amount".into(), tx.amount.clone());
             evidence.insert("historical_average".into(), format!("{avg:.7}"));
             evidence.insert("ratio".into(), format!("{ratio:.2}"));
-            evidence.insert("multiplier_threshold".into(), config.unusual_asset_movement_multiplier.to_string());
+            evidence.insert(
+                "multiplier_threshold".into(),
+                config.unusual_asset_movement_multiplier.to_string(),
+            );
             evidence.insert("history_size".into(), same_asset_history.len().to_string());
             Some(TriggeredRule {
                 rule_id: self.id().into(),
@@ -317,9 +342,15 @@ impl Rule for DormantAccountReactivationRule {
         if gap_secs >= config.dormant_reactivation_gap_secs {
             let mut evidence = HashMap::new();
             evidence.insert("gap_secs".into(), gap_secs.to_string());
-            evidence.insert("gap_threshold_secs".into(), config.dormant_reactivation_gap_secs.to_string());
+            evidence.insert(
+                "gap_threshold_secs".into(),
+                config.dormant_reactivation_gap_secs.to_string(),
+            );
             evidence.insert("amount".into(), tx.amount.clone());
-            evidence.insert("min_amount_threshold".into(), config.dormant_reactivation_min_amount.to_string());
+            evidence.insert(
+                "min_amount_threshold".into(),
+                config.dormant_reactivation_min_amount.to_string(),
+            );
             evidence.insert("last_prior_tx_hash".into(), last_prior.tx_hash.clone());
             Some(TriggeredRule {
                 rule_id: self.id().into(),
@@ -364,7 +395,10 @@ impl Rule for RoundTripWashTradingRule {
 
         if let Some(prior) = round_trip {
             let mut evidence = HashMap::new();
-            evidence.insert("window_secs".into(), config.wash_trading_window_secs.to_string());
+            evidence.insert(
+                "window_secs".into(),
+                config.wash_trading_window_secs.to_string(),
+            );
             evidence.insert("return_leg_tx_hash".into(), prior.tx_hash.clone());
             evidence.insert("return_leg_amount".into(), prior.amount.clone());
             evidence.insert("outbound_amount".into(), tx.amount.clone());
@@ -399,9 +433,7 @@ impl Rule for NewAccountHighValueOutflowRule {
         ctx: &RuleContext,
         config: &RulesConfig,
     ) -> Option<TriggeredRule> {
-        if tx.destination_account.is_none() {
-            return None;
-        }
+        tx.destination_account.as_ref()?;
         if tx.amount_f64() < config.new_account_outflow_threshold {
             return None;
         }
@@ -415,9 +447,15 @@ impl Rule for NewAccountHighValueOutflowRule {
         if outgoing_count <= config.new_account_history_threshold {
             let mut evidence = HashMap::new();
             evidence.insert("prior_outgoing_count".into(), outgoing_count.to_string());
-            evidence.insert("history_threshold".into(), config.new_account_history_threshold.to_string());
+            evidence.insert(
+                "history_threshold".into(),
+                config.new_account_history_threshold.to_string(),
+            );
             evidence.insert("amount".into(), tx.amount.clone());
-            evidence.insert("amount_threshold".into(), config.new_account_outflow_threshold.to_string());
+            evidence.insert(
+                "amount_threshold".into(),
+                config.new_account_outflow_threshold.to_string(),
+            );
             Some(TriggeredRule {
                 rule_id: self.id().into(),
                 rule_name: "New Account High-Value Outflow".into(),
@@ -456,9 +494,18 @@ impl Rule for CrossAssetRapidConversionRule {
 
         if distinct_assets.len() >= config.cross_asset_conversion_count_threshold {
             let mut evidence = HashMap::new();
-            evidence.insert("distinct_asset_count".into(), distinct_assets.len().to_string());
-            evidence.insert("count_threshold".into(), config.cross_asset_conversion_count_threshold.to_string());
-            evidence.insert("window_secs".into(), config.cross_asset_conversion_window_secs.to_string());
+            evidence.insert(
+                "distinct_asset_count".into(),
+                distinct_assets.len().to_string(),
+            );
+            evidence.insert(
+                "count_threshold".into(),
+                config.cross_asset_conversion_count_threshold.to_string(),
+            );
+            evidence.insert(
+                "window_secs".into(),
+                config.cross_asset_conversion_window_secs.to_string(),
+            );
             Some(TriggeredRule {
                 rule_id: self.id().into(),
                 rule_name: "Cross-Asset Rapid Conversion".into(),
@@ -588,7 +635,9 @@ mod tests {
     fn configurable_threshold_uses_named_limits() {
         let rule = ConfigurableThresholdRule;
         let mut config = RulesConfig::default();
-        config.custom_thresholds.insert("max_single_asset_exposure".into(), 500.0);
+        config
+            .custom_thresholds
+            .insert("max_single_asset_exposure".into(), 500.0);
         let current = tx("600", 0, Some("GBOB"));
         let ctx = RuleContext::default();
         let result = rule.evaluate(&current, &ctx, &config).unwrap();
@@ -600,7 +649,13 @@ mod tests {
         let rule = DormantAccountReactivationRule;
         let config = RulesConfig::default();
         // last activity ~40 days ago, well beyond the 30-day default gap
-        let history = vec![tx_from("GALICE", "10", -(40 * 24 * 60 * 60), Some("GBOB"), Asset::Native)];
+        let history = vec![tx_from(
+            "GALICE",
+            "10",
+            -(40 * 24 * 60 * 60),
+            Some("GBOB"),
+            Asset::Native,
+        )];
         let ctx = RuleContext::new(history, HashSet::new());
         let current = tx_from("GALICE", "5000", 0, Some("GBOB"), Asset::Native);
         let result = rule.evaluate(&current, &ctx, &config).unwrap();
@@ -676,8 +731,26 @@ mod tests {
         let rule = CrossAssetRapidConversionRule;
         let config = RulesConfig::default();
         let history = vec![
-            tx_from("GALICE", "10", -100, Some("GBOB"), Asset::Credit { code: "USDC".into(), issuer: "GISSUER1".into() }),
-            tx_from("GALICE", "10", -200, Some("GBOB"), Asset::Credit { code: "EURC".into(), issuer: "GISSUER2".into() }),
+            tx_from(
+                "GALICE",
+                "10",
+                -100,
+                Some("GBOB"),
+                Asset::Credit {
+                    code: "USDC".into(),
+                    issuer: "GISSUER1".into(),
+                },
+            ),
+            tx_from(
+                "GALICE",
+                "10",
+                -200,
+                Some("GBOB"),
+                Asset::Credit {
+                    code: "EURC".into(),
+                    issuer: "GISSUER2".into(),
+                },
+            ),
         ];
         let ctx = RuleContext::new(history, HashSet::new());
         let current = tx_from("GALICE", "10", 0, Some("GBOB"), Asset::Native);
@@ -705,7 +778,9 @@ mod tests {
         let current = tx("20000", 0, Some("GBOB"));
         let triggered = engine.evaluate(&current, &ctx, &config);
         assert!(triggered.iter().any(|t| t.rule_id == "large_transfer"));
-        assert!(triggered.iter().any(|t| t.rule_id == "flagged_account_interaction"));
+        assert!(triggered
+            .iter()
+            .any(|t| t.rule_id == "flagged_account_interaction"));
         let ids: Vec<&str> = triggered.iter().map(|t| t.rule_id.as_str()).collect();
         let mut sorted_ids = ids.clone();
         sorted_ids.sort();
