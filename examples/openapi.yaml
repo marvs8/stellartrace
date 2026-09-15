@@ -1,0 +1,249 @@
+openapi: 3.0.3
+info:
+  title: StellarTrace API
+  description: >
+    Fraud and anomaly detection triage API for the Stellar ecosystem.
+    The AI advisory endpoint is strictly advisory — see
+    docs/ai-boundary.md. Only the decision endpoint, with an
+    Investigator/Admin bearer token, may change an alert's status.
+  version: 0.2.0
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8080
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Asset:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [native, credit]
+        code:
+          type: string
+        issuer:
+          type: string
+    NormalizedTransaction:
+      type: object
+      required: [tx_hash, ledger_sequence, source_account, asset, amount, timestamp, is_soroban_invocation, metadata]
+      properties:
+        tx_hash: { type: string }
+        ledger_sequence: { type: integer }
+        source_account: { type: string }
+        destination_account: { type: string, nullable: true }
+        asset: { $ref: "#/components/schemas/Asset" }
+        amount: { type: string, description: "Decimal amount as a string to avoid float precision loss." }
+        timestamp: { type: string, format: date-time }
+        is_soroban_invocation: { type: boolean }
+        contract_id: { type: string, nullable: true }
+        metadata: { type: object, additionalProperties: { type: string } }
+    TriggeredRule:
+      type: object
+      properties:
+        rule_id: { type: string }
+        rule_name: { type: string }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        reason: { type: string }
+        evidence: { type: object, additionalProperties: { type: string } }
+    Alert:
+      type: object
+      properties:
+        alert_id: { type: string, format: uuid }
+        tx_hash: { type: string }
+        source_account: { type: string }
+        destination_account: { type: string, nullable: true }
+        asset: { $ref: "#/components/schemas/Asset" }
+        amount: { type: string }
+        timestamp: { type: string, format: date-time }
+        triggered_rules:
+          type: array
+          items: { $ref: "#/components/schemas/TriggeredRule" }
+        anomaly_score: { type: number }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        status:
+          type: string
+          enum: [open, under_investigation, escalated, dismissed, confirmed_suspicious]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AiRecommendation:
+      type: object
+      description: Advisory only — see docs/ai-boundary.md. Cannot change alert status.
+      properties:
+        alert_id: { type: string, format: uuid }
+        label: { type: string, description: "Always the canonical advisory-only label, regardless of model output." }
+        summary: { type: string }
+        suspicious_signals: { type: array, items: { type: string } }
+        relevant_history_context: { type: string }
+        risk_assessment: { type: string }
+        recommended_next_steps: { type: array, items: { type: string } }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        explanation: { type: string }
+        generated_at: { type: string, format: date-time }
+        model_available: { type: boolean }
+    DecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [under_investigation, escalated, dismissed, confirmed_suspicious]
+        notes: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+paths:
+  /health:
+    get:
+      summary: Liveness check
+      responses:
+        "200": { description: OK }
+
+  /metrics:
+    get:
+      summary: Prometheus text exposition of internal counters
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain: { schema: { type: string } }
+
+  /api/transactions:
+    post:
+      summary: Ingest a transaction and immediately evaluate it against the rules engine
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NormalizedTransaction" }
+      responses:
+        "200":
+          description: Evaluation result, including a created Alert if any rule triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  triggered_rules:
+                    type: array
+                    items: { $ref: "#/components/schemas/TriggeredRule" }
+                  anomaly_score: { type: number }
+                  severity: { type: string }
+                  alert:
+                    oneOf:
+                      - { $ref: "#/components/schemas/Alert" }
+                      - { type: "null" }
+
+  /api/transactions/{tx_hash}:
+    get:
+      summary: Retrieve a previously ingested transaction
+      parameters:
+        - { name: tx_hash, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NormalizedTransaction" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/alerts:
+    get:
+      summary: List alerts
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [open, under_investigation, escalated, dismissed, confirmed_suspicious]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Alert" }
+
+  /api/alerts/{alert_id}:
+    get:
+      summary: Retrieve one alert
+      parameters:
+        - { name: alert_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+        "404": { description: Not found }
+
+  /api/alerts/{alert_id}/ai-investigation:
+    get:
+      summary: Get (generating if needed) the advisory AI recommendation for an alert
+      description: Advisory only. This endpoint cannot change the alert's status.
+      parameters:
+        - { name: alert_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiRecommendation" }
+        "404": { description: Not found }
+
+  /api/alerts/{alert_id}/decision:
+    post:
+      summary: Submit the final human decision for an alert
+      description: The only endpoint capable of changing an alert's status. Requires an Investigator or Admin token.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: alert_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DecisionRequest" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alert" }
+        "401": { description: Missing or invalid bearer token }
+        "403": { description: Authenticated but not authorized to decide (Viewer role) }
+        "404": { description: Not found }
+
+  /api/alerts/{alert_id}/audit:
+    get:
+      summary: Full audit trail for one alert
+      parameters:
+        - { name: alert_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK }
+
+  /api/audit/verify:
+    get:
+      summary: Verify the whole audit chain's integrity
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  intact: { type: boolean }
+                  detail: { type: string, nullable: true }
