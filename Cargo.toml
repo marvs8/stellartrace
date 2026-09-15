@@ -9,6 +9,7 @@ members = [
     "crates/audit",
     "crates/ai_advisor",
     "crates/api",
+    "crates/storage",
 ]
 exclude = ["contracts/flagged_accounts"]
 
@@ -41,3 +42,4 @@ stellartrace-scoring = { path = "crates/scoring" }
 stellartrace-alerts = { path = "crates/alerts" }
 stellartrace-audit = { path = "crates/audit" }
 stellartrace-ai-advisor = { path = "crates/ai_advisor" }
+stellartrace-storage = { path = "crates/storage" }
