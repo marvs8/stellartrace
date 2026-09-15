@@ -109,6 +109,15 @@ impl AuditLog {
         self.records.read().unwrap().clone()
     }
 
+    /// Seeds the log with previously-persisted records, e.g. restored
+    /// from a `stellartrace-storage` snapshot at startup. Callers should
+    /// call this once, before any new records are appended, and should
+    /// run `verify_integrity()` immediately afterward to confirm the
+    /// restored chain was not tampered with while at rest.
+    pub fn restore(&self, records: Vec<AuditRecord>) {
+        *self.records.write().unwrap() = records;
+    }
+
     /// Recomputes the hash chain over the full log and returns `Ok(())`
     /// if every record's stored hash matches its recomputed hash and
     /// correctly chains to its predecessor. Any mismatch means a record
@@ -186,6 +195,20 @@ mod tests {
             log.append(alert_id, "tx1", AuditEventKind::Note { message: "x".into() });
         }
         assert!(log.verify_integrity().is_ok());
+    }
+
+    #[test]
+    fn restore_seeds_log_and_preserves_integrity() {
+        let original = AuditLog::new();
+        let alert_id = Uuid::new_v4();
+        original.append(alert_id, "tx1", AuditEventKind::Note { message: "a".into() });
+        original.append(alert_id, "tx1", AuditEventKind::Note { message: "b".into() });
+
+        let restored = AuditLog::new();
+        restored.restore(original.all());
+
+        assert_eq!(restored.for_alert(alert_id).len(), 2);
+        assert!(restored.verify_integrity().is_ok());
     }
 
     #[test]
