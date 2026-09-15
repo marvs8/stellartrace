@@ -1,0 +1,7 @@
+# Clippy configuration for StellarTrace.
+# Keep thresholds conservative; this is a compliance-facing system where
+# readability and explicitness are valued over cleverness.
+
+too-many-arguments-threshold = 8
+type-complexity-threshold = 300
+cognitive-complexity-threshold = 30
