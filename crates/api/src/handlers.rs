@@ -23,6 +23,10 @@ pub async fn health() -> &'static str {
     "ok"
 }
 
+pub async fn metrics(State(state): State<Arc<AppState>>) -> String {
+    state.metrics.render_prometheus_text()
+}
+
 // ---------- Transactions ----------
 
 pub async fn ingest_transaction(
@@ -31,6 +35,7 @@ pub async fn ingest_transaction(
 ) -> Result<Json<NormalizedTransaction>, ApiError> {
     tracing::info!(tx_hash = %tx.tx_hash, source = %tx.source_account, "ingesting transaction");
     state.record_transaction(tx.clone());
+    state.metrics.record_transaction_ingested();
     Ok(Json(tx))
 }
 
@@ -84,6 +89,7 @@ pub async fn ingest_and_evaluate(
 ) -> Result<Json<EvaluationResult>, ApiError> {
     let result = run_evaluation(&state, &tx);
     state.record_transaction(tx);
+    state.metrics.record_transaction_ingested();
     Ok(Json(result))
 }
 
@@ -103,6 +109,7 @@ fn run_evaluation(state: &AppState, tx: &NormalizedTransaction) -> EvaluationRes
     let severity = stellartrace_scoring::severity_for_score(anomaly_score);
 
     let alert = if !triggered_rules.is_empty() {
+        state.metrics.record_alert_created();
         Some(state.alerts.create_alert(tx, triggered_rules.clone(), anomaly_score, severity))
     } else {
         None
@@ -176,6 +183,7 @@ pub async fn get_ai_investigation(
     );
 
     let recommendation = state.advisor.investigate(&context).await;
+    state.metrics.record_ai_recommendation(recommendation.model_available);
 
     state.audit.append(
         alert_id,
@@ -231,6 +239,7 @@ pub async fn submit_decision(
     };
 
     let updated = state.alerts.apply_investigator_decision(decision)?;
+    state.metrics.record_investigator_decision();
 
     if updated.status == InvestigationStatus::ConfirmedSuspicious {
         let mut flagged = state.flagged_accounts.write().unwrap();
