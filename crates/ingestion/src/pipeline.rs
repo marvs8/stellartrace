@@ -25,9 +25,7 @@ pub enum IngestionError {
 /// Soroban RPC event subscription could implement this identically).
 #[async_trait]
 pub trait TransactionSource: Send + Sync {
-    async fn poll_next_batch(
-        &mut self,
-    ) -> Result<Vec<NormalizedTransaction>, IngestionError>;
+    async fn poll_next_batch(&mut self) -> Result<Vec<NormalizedTransaction>, IngestionError>;
 }
 
 pub struct RetryConfig {
@@ -56,7 +54,11 @@ pub struct IngestionPipeline<S: TransactionSource> {
 
 impl<S: TransactionSource> IngestionPipeline<S> {
     pub fn new(source: S) -> Self {
-        Self { source, retry: RetryConfig::default(), dead_letters: Vec::new() }
+        Self {
+            source,
+            retry: RetryConfig::default(),
+            dead_letters: Vec::new(),
+        }
     }
 
     pub fn with_retry_config(mut self, retry: RetryConfig) -> Self {
@@ -156,7 +158,10 @@ mod tests {
     #[tokio::test]
     async fn retries_until_success() {
         let calls = Arc::new(AtomicU32::new(0));
-        let source = FlakySource { fail_times: 3, calls: calls.clone() };
+        let source = FlakySource {
+            fail_times: 3,
+            calls: calls.clone(),
+        };
         let mut pipeline = IngestionPipeline::new(source).with_retry_config(RetryConfig {
             max_attempts: 5,
             base_delay: Duration::from_millis(1),
@@ -170,7 +175,10 @@ mod tests {
     #[tokio::test]
     async fn surfaces_error_after_exhausting_retries() {
         let calls = Arc::new(AtomicU32::new(0));
-        let source = FlakySource { fail_times: 100, calls: calls.clone() };
+        let source = FlakySource {
+            fail_times: 100,
+            calls: calls.clone(),
+        };
         let mut pipeline = IngestionPipeline::new(source).with_retry_config(RetryConfig {
             max_attempts: 3,
             base_delay: Duration::from_millis(1),

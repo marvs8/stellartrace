@@ -35,7 +35,9 @@ fn test_app() -> axum::Router {
 }
 
 async fn body_text(response: axum::response::Response) -> String {
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     String::from_utf8(bytes.to_vec()).unwrap()
 }
 
@@ -45,7 +47,12 @@ async fn metrics_endpoint_reflects_ingestion_and_decision_activity() {
 
     let before = app
         .clone()
-        .oneshot(Request::builder().uri("/metrics").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/metrics")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(before.status(), StatusCode::OK);
@@ -77,12 +84,21 @@ async fn metrics_endpoint_reflects_ingestion_and_decision_activity() {
         )
         .await
         .unwrap();
-    let eval_json: serde_json::Value =
-        serde_json::from_slice(&axum::body::to_bytes(eval.into_body(), usize::MAX).await.unwrap()).unwrap();
+    let eval_json: serde_json::Value = serde_json::from_slice(
+        &axum::body::to_bytes(eval.into_body(), usize::MAX)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     let alert_id = eval_json["alert"]["alert_id"].as_str().unwrap().to_string();
 
     app.clone()
-        .oneshot(Request::builder().uri(format!("/api/alerts/{alert_id}/ai-investigation")).body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/alerts/{alert_id}/ai-investigation"))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
@@ -93,7 +109,9 @@ async fn metrics_endpoint_reflects_ingestion_and_decision_activity() {
                 .uri(format!("/api/alerts/{alert_id}/decision"))
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer inv-token")
-                .body(Body::from(serde_json::json!({"decision": "dismissed", "notes": "reviewed"}).to_string()))
+                .body(Body::from(
+                    serde_json::json!({"decision": "dismissed", "notes": "reviewed"}).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -101,7 +119,12 @@ async fn metrics_endpoint_reflects_ingestion_and_decision_activity() {
 
     let after = app
         .clone()
-        .oneshot(Request::builder().uri("/metrics").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/metrics")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let after_text = body_text(after).await;

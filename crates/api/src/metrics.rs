@@ -16,7 +16,8 @@ pub struct Metrics {
 
 impl Metrics {
     pub fn record_transaction_ingested(&self) {
-        self.transactions_ingested_total.fetch_add(1, Ordering::Relaxed);
+        self.transactions_ingested_total
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn record_alert_created(&self) {
@@ -24,14 +25,16 @@ impl Metrics {
     }
 
     pub fn record_ai_recommendation(&self, model_available: bool) {
-        self.ai_recommendations_total.fetch_add(1, Ordering::Relaxed);
+        self.ai_recommendations_total
+            .fetch_add(1, Ordering::Relaxed);
         if !model_available {
             self.ai_fallback_total.fetch_add(1, Ordering::Relaxed);
         }
     }
 
     pub fn record_investigator_decision(&self) {
-        self.investigator_decisions_total.fetch_add(1, Ordering::Relaxed);
+        self.investigator_decisions_total
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Renders current counter values as Prometheus text exposition

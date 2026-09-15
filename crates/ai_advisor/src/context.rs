@@ -30,7 +30,10 @@ pub struct AiContext {
     pub recent_related_history_summary: String,
 }
 
-pub fn build_context(alert: &Alert, recent_related_history_summary: impl Into<String>) -> AiContext {
+pub fn build_context(
+    alert: &Alert,
+    recent_related_history_summary: impl Into<String>,
+) -> AiContext {
     AiContext {
         alert_id: alert.alert_id,
         tx_hash: alert.tx_hash.clone(),
@@ -39,7 +42,11 @@ pub fn build_context(alert: &Alert, recent_related_history_summary: impl Into<St
         asset_description: alert.asset.to_string(),
         amount: alert.amount.clone(),
         timestamp: alert.timestamp,
-        triggered_rule_reasons: alert.triggered_rules.iter().map(|r| r.reason.clone()).collect(),
+        triggered_rule_reasons: alert
+            .triggered_rules
+            .iter()
+            .map(|r| r.reason.clone())
+            .collect(),
         anomaly_score: alert.anomaly_score,
         severity: format!("{:?}", alert.severity),
         recent_related_history_summary: recent_related_history_summary.into(),

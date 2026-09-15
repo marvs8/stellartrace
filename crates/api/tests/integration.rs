@@ -56,7 +56,9 @@ fn large_tx_json() -> serde_json::Value {
 }
 
 async fn body_json(response: axum::response::Response) -> serde_json::Value {
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     serde_json::from_slice(&bytes).unwrap()
 }
 
@@ -64,7 +66,12 @@ async fn body_json(response: axum::response::Response) -> serde_json::Value {
 async fn health_check_ok() {
     let app = test_app();
     let response = app
-        .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
@@ -87,8 +94,15 @@ async fn ingest_evaluate_and_create_alert_flow() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
     let json = body_json(response).await;
-    assert!(json["alert"].is_object(), "large transfer should create an alert: {json:?}");
-    assert!(json["triggered_rules"].as_array().unwrap().iter().any(|r| r["rule_id"] == "large_transfer"));
+    assert!(
+        json["alert"].is_object(),
+        "large transfer should create an alert: {json:?}"
+    );
+    assert!(json["triggered_rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["rule_id"] == "large_transfer"));
 }
 
 #[tokio::test]
@@ -131,7 +145,12 @@ async fn ai_investigation_endpoint_never_changes_alert_status() {
     // Status must still be "open" — no AI call can have changed it.
     let get_response = app
         .clone()
-        .oneshot(Request::builder().uri(format!("/api/alerts/{alert_id}")).body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/alerts/{alert_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let alert: Alert = serde_json::from_value(body_json(get_response).await).unwrap();
@@ -165,7 +184,9 @@ async fn decision_requires_authorization() {
                 .method("POST")
                 .uri(format!("/api/alerts/{alert_id}/decision"))
                 .header("content-type", "application/json")
-                .body(Body::from(serde_json::json!({"decision": "dismissed", "notes": "n/a"}).to_string()))
+                .body(Body::from(
+                    serde_json::json!({"decision": "dismissed", "notes": "n/a"}).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -181,7 +202,9 @@ async fn decision_requires_authorization() {
                 .uri(format!("/api/alerts/{alert_id}/decision"))
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer viewer-token")
-                .body(Body::from(serde_json::json!({"decision": "dismissed", "notes": "n/a"}).to_string()))
+                .body(Body::from(
+                    serde_json::json!({"decision": "dismissed", "notes": "n/a"}).to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -229,7 +252,12 @@ async fn audit_trail_records_every_step_and_is_intact() {
     let alert_id = eval_json["alert"]["alert_id"].as_str().unwrap().to_string();
 
     app.clone()
-        .oneshot(Request::builder().uri(format!("/api/alerts/{alert_id}/ai-investigation")).body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/alerts/{alert_id}/ai-investigation"))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
 
@@ -240,7 +268,10 @@ async fn audit_trail_records_every_step_and_is_intact() {
                 .uri(format!("/api/alerts/{alert_id}/decision"))
                 .header("content-type", "application/json")
                 .header("authorization", "Bearer inv-token")
-                .body(Body::from(serde_json::json!({"decision": "escalated", "notes": "sending to compliance"}).to_string()))
+                .body(Body::from(
+                    serde_json::json!({"decision": "escalated", "notes": "sending to compliance"})
+                        .to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -248,7 +279,12 @@ async fn audit_trail_records_every_step_and_is_intact() {
 
     let audit_response = app
         .clone()
-        .oneshot(Request::builder().uri(format!("/api/alerts/{alert_id}/audit")).body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/alerts/{alert_id}/audit"))
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let audit_records = body_json(audit_response).await;
@@ -268,7 +304,12 @@ async fn audit_trail_records_every_step_and_is_intact() {
 
     let verify_response = app
         .clone()
-        .oneshot(Request::builder().uri("/api/audit/verify").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::builder()
+                .uri("/api/audit/verify")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     let verify_json = body_json(verify_response).await;

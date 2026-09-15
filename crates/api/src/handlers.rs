@@ -11,7 +11,10 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use stellartrace_ai_advisor::build_context;
 use stellartrace_audit::{AuditEventKind, AuditRecord};
-use stellartrace_common::{Alert, AiRecommendation, InvestigationStatus, InvestigatorDecision, NormalizedTransaction, TriggeredRule};
+use stellartrace_common::{
+    AiRecommendation, Alert, InvestigationStatus, InvestigatorDecision, NormalizedTransaction,
+    TriggeredRule,
+};
 use stellartrace_rules_engine::RuleContext;
 use uuid::Uuid;
 
@@ -110,12 +113,21 @@ fn run_evaluation(state: &AppState, tx: &NormalizedTransaction) -> EvaluationRes
 
     let alert = if !triggered_rules.is_empty() {
         state.metrics.record_alert_created();
-        Some(state.alerts.create_alert(tx, triggered_rules.clone(), anomaly_score, severity))
+        Some(
+            state
+                .alerts
+                .create_alert(tx, triggered_rules.clone(), anomaly_score, severity),
+        )
     } else {
         None
     };
 
-    EvaluationResult { triggered_rules, anomaly_score, severity, alert }
+    EvaluationResult {
+        triggered_rules,
+        anomaly_score,
+        severity,
+        alert,
+    }
 }
 
 // ---------- Alerts ----------
@@ -131,11 +143,19 @@ pub async fn list_alerts(
 ) -> Result<Json<Vec<Alert>>, ApiError> {
     let alerts = match q.status.as_deref() {
         Some("open") => state.alerts.list_by_status(InvestigationStatus::Open),
-        Some("under_investigation") => state.alerts.list_by_status(InvestigationStatus::UnderInvestigation),
+        Some("under_investigation") => state
+            .alerts
+            .list_by_status(InvestigationStatus::UnderInvestigation),
         Some("escalated") => state.alerts.list_by_status(InvestigationStatus::Escalated),
         Some("dismissed") => state.alerts.list_by_status(InvestigationStatus::Dismissed),
-        Some("confirmed_suspicious") => state.alerts.list_by_status(InvestigationStatus::ConfirmedSuspicious),
-        Some(other) => return Err(ApiError::bad_request(format!("unknown status filter: {other}"))),
+        Some("confirmed_suspicious") => state
+            .alerts
+            .list_by_status(InvestigationStatus::ConfirmedSuspicious),
+        Some(other) => {
+            return Err(ApiError::bad_request(format!(
+                "unknown status filter: {other}"
+            )))
+        }
         None => state.alerts.list(),
     };
     Ok(Json(alerts))
@@ -179,11 +199,18 @@ pub async fn get_ai_investigation(
     state.audit.append(
         alert_id,
         alert.tx_hash.clone(),
-        AuditEventKind::AiContextSent { context_summary: format!("{} triggered rule reasons sent", context.triggered_rule_reasons.len()) },
+        AuditEventKind::AiContextSent {
+            context_summary: format!(
+                "{} triggered rule reasons sent",
+                context.triggered_rule_reasons.len()
+            ),
+        },
     );
 
     let recommendation = state.advisor.investigate(&context).await;
-    state.metrics.record_ai_recommendation(recommendation.model_available);
+    state
+        .metrics
+        .record_ai_recommendation(recommendation.model_available);
 
     state.audit.append(
         alert_id,
@@ -194,7 +221,11 @@ pub async fn get_ai_investigation(
         },
     );
 
-    state.ai_recommendations.write().unwrap().insert(alert_id, recommendation.clone());
+    state
+        .ai_recommendations
+        .write()
+        .unwrap()
+        .insert(alert_id, recommendation.clone());
 
     tracing::info!(
         alert_id = %alert_id,
@@ -276,7 +307,13 @@ pub struct IntegrityResponse {
 
 pub async fn verify_audit_integrity(State(state): State<Arc<AppState>>) -> Json<IntegrityResponse> {
     match state.audit.verify_integrity() {
-        Ok(()) => Json(IntegrityResponse { intact: true, detail: None }),
-        Err(e) => Json(IntegrityResponse { intact: false, detail: Some(e.to_string()) }),
+        Ok(()) => Json(IntegrityResponse {
+            intact: true,
+            detail: None,
+        }),
+        Err(e) => Json(IntegrityResponse {
+            intact: false,
+            detail: Some(e.to_string()),
+        }),
     }
 }

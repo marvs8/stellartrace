@@ -22,16 +22,28 @@ pub struct RuleContext {
 }
 
 impl RuleContext {
-    pub fn new(account_history: Vec<NormalizedTransaction>, flagged_accounts: HashSet<String>) -> Self {
-        Self { account_history, flagged_accounts }
+    pub fn new(
+        account_history: Vec<NormalizedTransaction>,
+        flagged_accounts: HashSet<String>,
+    ) -> Self {
+        Self {
+            account_history,
+            flagged_accounts,
+        }
     }
 
     /// Transactions in `account_history` that occurred within `window_secs`
     /// before `at`.
-    pub fn within_window(&self, at: DateTime<Utc>, window_secs: i64) -> Vec<&NormalizedTransaction> {
+    pub fn within_window(
+        &self,
+        at: DateTime<Utc>,
+        window_secs: i64,
+    ) -> Vec<&NormalizedTransaction> {
         self.account_history
             .iter()
-            .filter(|tx| (at - tx.timestamp).num_seconds().abs() <= window_secs && tx.timestamp <= at)
+            .filter(|tx| {
+                (at - tx.timestamp).num_seconds().abs() <= window_secs && tx.timestamp <= at
+            })
             .collect()
     }
 }

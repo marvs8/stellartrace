@@ -110,7 +110,10 @@ mod tests {
     #[test]
     fn load_from_file_parses_valid_toml() {
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("stellartrace_test_config_{}.toml", uuid_like_suffix()));
+        let path = dir.join(format!(
+            "stellartrace_test_config_{}.toml",
+            uuid_like_suffix()
+        ));
         std::fs::write(&path, "large_transfer_threshold = 42.0\n").unwrap();
         let config = load_from_file(&path).unwrap();
         assert_eq!(config.large_transfer_threshold, 42.0);
@@ -126,7 +129,10 @@ mod tests {
     #[test]
     fn load_from_file_errors_on_malformed_toml() {
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("stellartrace_test_bad_config_{}.toml", uuid_like_suffix()));
+        let path = dir.join(format!(
+            "stellartrace_test_bad_config_{}.toml",
+            uuid_like_suffix()
+        ));
         std::fs::write(&path, "this is not valid toml {{{").unwrap();
         let result = load_from_file(&path);
         assert!(result.is_err());

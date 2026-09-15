@@ -71,12 +71,15 @@ async fn main() -> anyhow::Result<()> {
         stellartrace_api::persistence::restore_on_startup(&state, &paths);
         stellartrace_api::persistence::spawn_periodic_snapshot(state.clone(), paths);
     } else {
-        tracing::info!("STELLARTRACE_DATA_DIR not set; running in-memory only, no snapshot persistence");
+        tracing::info!(
+            "STELLARTRACE_DATA_DIR not set; running in-memory only, no snapshot persistence"
+        );
     }
 
     let app = stellartrace_api::build_router(state);
 
-    let addr = std::env::var("STELLARTRACE_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    let addr =
+        std::env::var("STELLARTRACE_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
     tracing::info!(%addr, "starting StellarTrace API");
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;

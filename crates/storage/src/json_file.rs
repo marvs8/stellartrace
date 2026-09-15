@@ -18,7 +18,10 @@ pub struct JsonFileStore<T> {
 
 impl<T> JsonFileStore<T> {
     pub fn new(path: impl AsRef<Path>) -> Self {
-        Self { path: path.as_ref().to_path_buf(), _marker: PhantomData }
+        Self {
+            path: path.as_ref().to_path_buf(),
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -59,7 +62,10 @@ mod tests {
     fn temp_path(tag: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "stellartrace_storage_test_{tag}_{}.json",
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ))
     }
 
@@ -68,7 +74,11 @@ mod tests {
         let path = temp_path("roundtrip");
         let store: JsonFileStore<Sample> = JsonFileStore::new(&path);
 
-        let original = Sample { id: 1, name: "alert-snapshot".into(), values: vec![1, 2, 3] };
+        let original = Sample {
+            id: 1,
+            name: "alert-snapshot".into(),
+            values: vec![1, 2, 3],
+        };
         store.save(&original).unwrap();
 
         let loaded = store.load().unwrap().unwrap();
@@ -89,8 +99,20 @@ mod tests {
         let path = temp_path("overwrite");
         let store: JsonFileStore<Sample> = JsonFileStore::new(&path);
 
-        store.save(&Sample { id: 1, name: "first".into(), values: vec![] }).unwrap();
-        store.save(&Sample { id: 2, name: "second".into(), values: vec![9] }).unwrap();
+        store
+            .save(&Sample {
+                id: 1,
+                name: "first".into(),
+                values: vec![],
+            })
+            .unwrap();
+        store
+            .save(&Sample {
+                id: 2,
+                name: "second".into(),
+                values: vec![9],
+            })
+            .unwrap();
 
         let loaded = store.load().unwrap().unwrap();
         assert_eq!(loaded.id, 2);
@@ -103,12 +125,21 @@ mod tests {
     fn save_creates_parent_directories() {
         let base = std::env::temp_dir().join(format!(
             "stellartrace_storage_test_nested_{}",
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let path = base.join("nested").join("dir").join("snapshot.json");
         let store: JsonFileStore<Sample> = JsonFileStore::new(&path);
 
-        store.save(&Sample { id: 7, name: "nested".into(), values: vec![] }).unwrap();
+        store
+            .save(&Sample {
+                id: 7,
+                name: "nested".into(),
+                values: vec![],
+            })
+            .unwrap();
         assert!(path.exists());
 
         std::fs::remove_dir_all(&base).ok();

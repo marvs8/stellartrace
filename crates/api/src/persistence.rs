@@ -22,7 +22,10 @@ pub struct PersistencePaths {
 impl PersistencePaths {
     pub fn new(data_dir: &str) -> Self {
         let base = PathBuf::from(data_dir);
-        Self { alerts: base.join("alerts.json"), audit: base.join("audit.json") }
+        Self {
+            alerts: base.join("alerts.json"),
+            audit: base.join("audit.json"),
+        }
     }
 }
 
@@ -48,7 +51,10 @@ pub fn restore_on_startup(state: &Arc<AppState>, paths: &PersistencePaths) {
             let count = records.len();
             state.audit.restore(records);
             match state.audit.verify_integrity() {
-                Ok(()) => tracing::info!(count, "restored audit log from snapshot; integrity verified"),
+                Ok(()) => tracing::info!(
+                    count,
+                    "restored audit log from snapshot; integrity verified"
+                ),
                 Err(e) => tracing::error!(
                     error = %e,
                     "restored audit log FAILED integrity verification — see docs/runbook.md#audit-integrity-failure"

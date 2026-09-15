@@ -159,7 +159,9 @@ impl AiAdvisor for ClaudeAdvisor {
             .ok_or_else(|| AiAdvisorError::UnparseableResponse("empty content".into()))?;
 
         let model_output: ExpectedModelOutput = extract_json(&text)
-            .ok_or_else(|| AiAdvisorError::UnparseableResponse("no JSON object found in response".into()))
+            .ok_or_else(|| {
+                AiAdvisorError::UnparseableResponse("no JSON object found in response".into())
+            })
             .and_then(|json_str| {
                 serde_json::from_str(&json_str)
                     .map_err(|e| AiAdvisorError::UnparseableResponse(e.to_string()))
@@ -200,7 +202,8 @@ mod tests {
 
     #[test]
     fn extract_json_pulls_object_out_of_prose() {
-        let text = "Sure, here you go:\n```json\n{\"summary\":\"ok\",\"confidence\":0.5}\n```\nDone.";
+        let text =
+            "Sure, here you go:\n```json\n{\"summary\":\"ok\",\"confidence\":0.5}\n```\nDone.";
         let extracted = extract_json(text).unwrap();
         let parsed: ExpectedModelOutput = serde_json::from_str(&extracted).unwrap();
         assert_eq!(parsed.summary, "ok");
@@ -210,6 +213,9 @@ mod tests {
     #[test]
     fn missing_api_key_yields_not_configured() {
         std::env::remove_var("ANTHROPIC_API_KEY");
-        assert!(matches!(ClaudeAdvisor::from_env(), Err(AiAdvisorError::NotConfigured)));
+        assert!(matches!(
+            ClaudeAdvisor::from_env(),
+            Err(AiAdvisorError::NotConfigured)
+        ));
     }
 }

@@ -135,7 +135,10 @@ mod tests {
         let tx = normalize_horizon_operation(op).unwrap();
         assert_eq!(
             tx.asset,
-            Asset::Credit { code: "USDC".into(), issuer: "GISSUER".into() }
+            Asset::Credit {
+                code: "USDC".into(),
+                issuer: "GISSUER".into()
+            }
         );
     }
 

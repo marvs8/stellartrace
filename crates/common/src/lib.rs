@@ -99,7 +99,10 @@ pub enum InvestigationStatus {
 
 impl InvestigationStatus {
     pub fn is_terminal(&self) -> bool {
-        matches!(self, InvestigationStatus::Dismissed | InvestigationStatus::ConfirmedSuspicious)
+        matches!(
+            self,
+            InvestigationStatus::Dismissed | InvestigationStatus::ConfirmedSuspicious
+        )
     }
 }
 

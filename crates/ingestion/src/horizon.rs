@@ -68,8 +68,14 @@ impl HorizonClient for HttpHorizonClient {
             cursor,
             self.page_limit
         );
-        let resp: HorizonOperationsResponse =
-            self.http.get(&url).send().await?.error_for_status()?.json().await?;
+        let resp: HorizonOperationsResponse = self
+            .http
+            .get(&url)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
         let mut normalized = Vec::new();
         let mut next_cursor = cursor.to_string();

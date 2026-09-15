@@ -19,7 +19,12 @@ pub struct ScoringWeights {
 
 impl Default for ScoringWeights {
     fn default() -> Self {
-        Self { low: 1.0, medium: 3.0, high: 6.0, critical: 12.0 }
+        Self {
+            low: 1.0,
+            medium: 3.0,
+            high: 6.0,
+            critical: 12.0,
+        }
     }
 }
 
@@ -41,9 +46,11 @@ pub fn compute_score(triggered_rules: &[TriggeredRule], weights: &ScoringWeights
         return 0.0;
     }
     let mut sorted: Vec<&TriggeredRule> = triggered_rules.iter().collect();
-    sorted.sort_by(|a, b| weight_for(weights, b.severity)
-        .partial_cmp(&weight_for(weights, a.severity))
-        .unwrap());
+    sorted.sort_by(|a, b| {
+        weight_for(weights, b.severity)
+            .partial_cmp(&weight_for(weights, a.severity))
+            .unwrap()
+    });
 
     let raw: f64 = sorted
         .iter()
@@ -104,7 +111,11 @@ mod tests {
         let one = compute_score(&[rule(Severity::Medium)], &weights);
         let two = compute_score(&[rule(Severity::Medium), rule(Severity::Medium)], &weights);
         let three = compute_score(
-            &[rule(Severity::Medium), rule(Severity::Medium), rule(Severity::Medium)],
+            &[
+                rule(Severity::Medium),
+                rule(Severity::Medium),
+                rule(Severity::Medium),
+            ],
             &weights,
         );
         assert!(two > one);
@@ -117,11 +128,11 @@ mod tests {
     fn single_critical_does_not_get_dwarfed_by_many_lows() {
         let weights = ScoringWeights::default();
         let critical = compute_score(&[rule(Severity::Critical)], &weights);
-        let many_lows = compute_score(
-            &vec![rule(Severity::Low); 10],
-            &weights,
+        let many_lows = compute_score(&vec![rule(Severity::Low); 10], &weights);
+        assert!(
+            critical > many_lows,
+            "critical={critical} many_lows={many_lows}"
         );
-        assert!(critical > many_lows, "critical={critical} many_lows={many_lows}");
     }
 
     #[test]

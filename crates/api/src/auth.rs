@@ -44,13 +44,19 @@ impl AuthRegistry {
                         "investigator" => Role::Investigator,
                         "viewer" => Role::Viewer,
                         other => {
-                            tracing::warn!(role = other, "unknown role in STELLARTRACE_API_TOKENS entry, skipping");
+                            tracing::warn!(
+                                role = other,
+                                "unknown role in STELLARTRACE_API_TOKENS entry, skipping"
+                            );
                             continue;
                         }
                     };
                     tokens.insert(
                         parts[0].to_string(),
-                        AuthUser { investigator_id: parts[2].to_string(), role },
+                        AuthUser {
+                            investigator_id: parts[2].to_string(),
+                            role,
+                        },
                     );
                 }
             }
@@ -61,7 +67,10 @@ impl AuthRegistry {
                 );
                 tokens.insert(
                     "dev-investigator-token".to_string(),
-                    AuthUser { investigator_id: "dev-investigator".to_string(), role: Role::Investigator },
+                    AuthUser {
+                        investigator_id: "dev-investigator".to_string(),
+                        role: Role::Investigator,
+                    },
                 );
             }
         }

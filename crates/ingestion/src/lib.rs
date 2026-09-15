@@ -10,4 +10,4 @@ pub mod horizon;
 pub mod normalize;
 pub mod pipeline;
 
-pub use pipeline::{IngestionPipeline, IngestionError, TransactionSource};
+pub use pipeline::{IngestionError, IngestionPipeline, TransactionSource};

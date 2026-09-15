@@ -43,7 +43,10 @@ const MAX_HISTORY_PER_ACCOUNT: usize = 500;
 
 impl AppState {
     pub fn record_transaction(&self, tx: NormalizedTransaction) {
-        self.transactions.write().unwrap().insert(tx.tx_hash.clone(), tx.clone());
+        self.transactions
+            .write()
+            .unwrap()
+            .insert(tx.tx_hash.clone(), tx.clone());
         let mut history = self.tx_history.write().unwrap();
 
         Self::push_bounded(&mut history, tx.source_account.clone(), tx.clone());
@@ -54,7 +57,11 @@ impl AppState {
         }
     }
 
-    fn push_bounded(history: &mut HashMap<String, Vec<NormalizedTransaction>>, account: String, tx: NormalizedTransaction) {
+    fn push_bounded(
+        history: &mut HashMap<String, Vec<NormalizedTransaction>>,
+        account: String,
+        tx: NormalizedTransaction,
+    ) {
         let entry = history.entry(account).or_default();
         entry.push(tx);
         if entry.len() > MAX_HISTORY_PER_ACCOUNT {
@@ -64,7 +71,12 @@ impl AppState {
     }
 
     pub fn history_for(&self, account: &str) -> Vec<NormalizedTransaction> {
-        self.tx_history.read().unwrap().get(account).cloned().unwrap_or_default()
+        self.tx_history
+            .read()
+            .unwrap()
+            .get(account)
+            .cloned()
+            .unwrap_or_default()
     }
 
     pub fn flagged_accounts_snapshot(&self) -> HashSet<String> {

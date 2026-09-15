@@ -29,8 +29,7 @@ fn bench_rule_evaluation(c: &mut Criterion) {
 
     // A moderately busy account: 100 prior transactions spread over the
     // last hour, so window-filtering rules have realistic work to do.
-    let history: Vec<NormalizedTransaction> =
-        (0..100).map(|i| make_tx(-(i * 30), "100")).collect();
+    let history: Vec<NormalizedTransaction> = (0..100).map(|i| make_tx(-(i * 30), "100")).collect();
     let ctx = RuleContext::new(history, HashSet::new());
     let tx = make_tx(0, "25000");
 
