@@ -1,0 +1,23 @@
+[Unit]
+Description=StellarTrace fraud/anomaly triage API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stellartrace
+Group=stellartrace
+WorkingDirectory=/opt/stellartrace
+EnvironmentFile=/opt/stellartrace/.env
+ExecStart=/opt/stellartrace/stellartrace-api
+Restart=on-failure
+RestartSec=5
+# Hardening — adjust if your environment needs broader access.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/stellartrace/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
