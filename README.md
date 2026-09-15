@@ -1,5 +1,9 @@
 # StellarTrace
 
+[![CI](https://github.com/marvs8/stellartrace/actions/workflows/ci.yml/badge.svg)](https://github.com/marvs8/stellartrace/actions/workflows/ci.yml)
+[![Soroban Contract CI](https://github.com/marvs8/stellartrace/actions/workflows/contract-ci.yml/badge.svg)](https://github.com/marvs8/stellartrace/actions/workflows/contract-ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A production-oriented fraud and anomaly detection triage system for the Stellar ecosystem: it ingests Stellar/Soroban transaction activity, runs it through a deterministic and explainable rules engine, scores and files alerts, offers an **advisory-only** AI investigation assistant, and enforces a strict human-in-the-loop decision workflow with a tamper-evident audit trail.
 
 StellarTrace is not a simple CRUD app. Its design center is: **explainability, deterministic detection, auditability, graceful failure handling, and a hard boundary between AI recommendations and human decisions.**
