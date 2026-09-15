@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod error;
 pub mod handlers;
+pub mod persistence;
 pub mod state;
 
 use axum::routing::{get, post};
