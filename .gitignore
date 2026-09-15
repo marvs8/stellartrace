@@ -1,0 +1,6 @@
+/target
+/contracts/*/target
+Cargo.lock.bak
+*.wasm
+.env
+.DS_Store

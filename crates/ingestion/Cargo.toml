@@ -1,0 +1,20 @@
+[package]
+name = "stellartrace-ingestion"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+stellartrace-common.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }

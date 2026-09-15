@@ -1,0 +1,9 @@
+[package]
+name = "stellartrace-scoring"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+stellartrace-common.workspace = true
+serde.workspace = true

@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>StellarTrace Investigator Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0b1220;
+    --panel: #121b2e;
+    --panel-2: #17233a;
+    --border: #24314d;
+    --text: #e6ecf5;
+    --muted: #93a2c0;
+    --accent: #4f8cff;
+    --low: #4f8cff;
+    --medium: #e0a938;
+    --high: #e0672c;
+    --critical: #e0304a;
+    --ai: #7b5fe8;
+    --human: #2fbf71;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+  }
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .conn {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .conn input {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: 12px; width: 220px;
+  }
+  .conn button {
+    background: var(--accent); border: none; color: white; padding: 6px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; min-height: calc(100vh - 65px); }
+  .alert-list { border-right: 1px solid var(--border); overflow-y: auto; max-height: calc(100vh - 65px); }
+  .alert-row {
+    padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .alert-row:hover { background: var(--panel-2); }
+  .alert-row.selected { background: var(--panel-2); border-left: 3px solid var(--accent); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge.low { background: rgba(79,140,255,.15); color: var(--low); }
+  .badge.medium { background: rgba(224,169,56,.15); color: var(--medium); }
+  .badge.high { background: rgba(224,103,44,.15); color: var(--high); }
+  .badge.critical { background: rgba(224,48,74,.15); color: var(--critical); }
+  .status-pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .row-acct { font-family: monospace; font-size: 12px; color: var(--muted); }
+  .row-amount { font-weight: 600; margin-top: 4px; }
+  .detail { padding: 24px; overflow-y: auto; max-height: calc(100vh - 65px); }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; margin-bottom: 18px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 12px; }
+  .field { margin-bottom: 8px; font-size: 13px; }
+  .field .k { color: var(--muted); display: inline-block; min-width: 140px; }
+  .rules-list { list-style: none; padding: 0; margin: 0; }
+  .rules-list li {
+    padding: 10px 12px; background: var(--panel-2); border-radius: 8px; margin-bottom: 8px; font-size: 13px;
+  }
+  .rules-list .rn { font-weight: 600; }
+  .rules-list .reason { color: var(--muted); margin-top: 4px; }
+
+  .ai-banner {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: rgba(123,95,232,.12); border: 1px solid rgba(123,95,232,.4);
+    border-radius: 8px; margin-bottom: 14px; font-size: 12px; color: #c3b6ff;
+  }
+  .ai-banner strong { color: var(--ai); }
+  .ai-card { border-color: rgba(123,95,232,.4); }
+  .ai-card h2 { color: var(--ai); }
+  .ai-field { margin-bottom: 10px; }
+  .ai-field .k { color: var(--muted); font-size: 12px; display: block; margin-bottom: 2px; }
+  .confidence-bar { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  .confidence-fill { height: 100%; background: var(--ai); }
+
+  .human-card { border-color: rgba(47,191,113,.4); }
+  .human-card h2 { color: var(--human); }
+  .human-banner {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: rgba(47,191,113,.10); border: 1px solid rgba(47,191,113,.4);
+    border-radius: 8px; margin-bottom: 14px; font-size: 12px; color: #9be8bd;
+  }
+  .human-banner strong { color: var(--human); }
+
+  select, textarea, button.decide {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px; font-size: 13px; width: 100%;
+  }
+  textarea { resize: vertical; min-height: 60px; margin-top: 8px; }
+  .decision-row { display: flex; gap: 8px; margin-top: 10px; }
+  .decision-row select { flex: 1; }
+  button.decide {
+    background: var(--human); color: #06251a; font-weight: 700; border: none; cursor: pointer; width: auto; padding: 8px 16px;
+  }
+  button.decide:disabled { opacity: .5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  }
+
+  .audit-item {
+    border-left: 2px solid var(--border); padding: 6px 0 6px 14px; margin-bottom: 4px; font-size: 12px;
+  }
+  .audit-item .t { color: var(--muted); font-size: 11px; }
+  .audit-item .k { font-weight: 600; }
+  .integrity-ok { color: var(--human); }
+  .integrity-bad { color: var(--critical); font-weight: 700; }
+  .msg { font-size: 12px; padding: 8px 12px; border-radius: 6px; margin-top: 8px; }
+  .msg.err { background: rgba(224,48,74,.15); color: var(--critical); }
+  .msg.ok { background: rgba(47,191,113,.15); color: var(--human); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>StellarTrace</h1>
+    <div class="sub">Fraud &amp; anomaly triage — AI advises, humans decide.</div>
+  </div>
+  <div class="conn">
+    <input id="apiBase" placeholder="API base URL" value="http://localhost:8080" />
+    <input id="token" placeholder="Investigator bearer token" value="dev-investigator-token" />
+    <button onclick="loadAlerts()">Connect / Refresh</button>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="alert-list" id="alertList">
+    <div class="empty">Loading alerts…</div>
+  </div>
+  <div class="detail" id="detail">
+    <div class="empty">Select an alert to view details.</div>
+  </div>
+</div>
+
+<script>
+const state = { alerts: [], selected: null };
+
+function apiBase() { return document.getElementById('apiBase').value.replace(/\/$/, ''); }
+function token() { return document.getElementById('token').value.trim(); }
+
+async function api(path, opts = {}) {
+  const headers = Object.assign({ 'content-type': 'application/json' }, opts.headers || {});
+  if (token()) headers['authorization'] = 'Bearer ' + token();
+  const res = await fetch(apiBase() + path, Object.assign({}, opts, { headers }));
+  const isJson = (res.headers.get('content-type') || '').includes('application/json');
+  const body = isJson ? await res.json() : await res.text();
+  if (!res.ok) throw { status: res.status, body };
+  return body;
+}
+
+function severityBadge(sev) {
+  const s = (sev || 'low').toLowerCase();
+  return `<span class="badge ${s}">${s}</span>`;
+}
+
+function statusPill(status) {
+  return `<span class="status-pill">${status}</span>`;
+}
+
+async function loadAlerts() {
+  const listEl = document.getElementById('alertList');
+  listEl.innerHTML = '<div class="empty">Loading alerts…</div>';
+  try {
+    state.alerts = await api('/api/alerts');
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty msg err">Failed to load alerts: ${escapeHtml(JSON.stringify(e.body || e))}</div>`;
+    return;
+  }
+  renderAlertList();
+}
+
+function renderAlertList() {
+  const listEl = document.getElementById('alertList');
+  if (state.alerts.length === 0) {
+    listEl.innerHTML = '<div class="empty">No alerts yet. Ingest a transaction via POST /api/transactions.</div>';
+    return;
+  }
+  listEl.innerHTML = state.alerts.map(a => `
+    <div class="alert-row ${state.selected === a.alert_id ? 'selected' : ''}" onclick="selectAlert('${a.alert_id}')">
+      <div class="row-top">
+        ${severityBadge(a.severity)}
+        ${statusPill(a.status)}
+      </div>
+      <div class="row-acct">${a.source_account} → ${a.destination_account || '—'}</div>
+      <div class="row-amount">${a.amount} ${assetLabel(a.asset)}</div>
+      <div class="row-acct">score ${a.anomaly_score.toFixed(1)} · ${a.triggered_rules.length} rule(s) · ${new Date(a.timestamp).toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+
+function assetLabel(asset) {
+  if (!asset) return '';
+  return asset.type === 'native' ? 'XLM' : `${asset.code}:${(asset.issuer || '').slice(0, 6)}…`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function selectAlert(id) {
+  state.selected = id;
+  renderAlertList();
+  const detail = document.getElementById('detail');
+  detail.innerHTML = '<div class="empty">Loading alert…</div>';
+
+  let alert, audit;
+  try {
+    [alert, audit] = await Promise.all([
+      api(`/api/alerts/${id}`),
+      api(`/api/alerts/${id}/audit`),
+    ]);
+  } catch (e) {
+    detail.innerHTML = `<div class="empty msg err">Failed to load alert: ${escapeHtml(JSON.stringify(e.body || e))}</div>`;
+    return;
+  }
+
+  detail.innerHTML = renderDetail(alert, audit);
+  loadAiInvestigation(id);
+}
+
+function renderDetail(alert, audit) {
+  const rulesHtml = alert.triggered_rules.map(r => `
+    <li>
+      <div class="row-top">
+        <span class="rn">${r.rule_name}</span>
+        ${severityBadge(r.severity)}
+      </div>
+      <div class="reason">${escapeHtml(r.reason)}</div>
+    </li>
+  `).join('') || '<li>No rules triggered.</li>';
+
+  const auditHtml = audit.map(rec => `
+    <div class="audit-item">
+      <div class="t">${new Date(rec.timestamp).toLocaleString()}</div>
+      <div><span class="k">${rec.event.event_type}</span> ${describeAuditEvent(rec.event)}</div>
+    </div>
+  `).join('') || '<div class="empty">No audit records yet.</div>';
+
+  return `
+    <div class="card">
+      <h2>Transaction</h2>
+      <div class="field"><span class="k">Tx hash</span><span style="font-family:monospace">${alert.tx_hash}</span></div>
+      <div class="field"><span class="k">Source</span><span style="font-family:monospace">${alert.source_account}</span></div>
+      <div class="field"><span class="k">Destination</span><span style="font-family:monospace">${alert.destination_account || '—'}</span></div>
+      <div class="field"><span class="k">Amount</span>${alert.amount} ${assetLabel(alert.asset)}</div>
+      <div class="field"><span class="k">Timestamp</span>${new Date(alert.timestamp).toLocaleString()}</div>
+      <div class="field"><span class="k">Anomaly score</span>${alert.anomaly_score.toFixed(2)} ${severityBadge(alert.severity)}</div>
+      <div class="field"><span class="k">Current status</span>${statusPill(alert.status)}</div>
+    </div>
+
+    <div class="card">
+      <h2>Triggered Rules (deterministic, explainable)</h2>
+      <ul class="rules-list">${rulesHtml}</ul>
+    </div>
+
+    <div class="card ai-card" id="aiCard">
+      <div class="ai-banner"><strong>⚠ ADVISORY ONLY</strong> — generated by AI. This is not a decision and cannot change alert status. Only a human investigator below can decide.</div>
+      <h2>AI Investigation Assistant</h2>
+      <div id="aiContent"><div class="empty">Loading AI advisory recommendation…</div></div>
+    </div>
+
+    <div class="card human-card">
+      <div class="human-banner"><strong>🧑‍⚖ HUMAN DECISION REQUIRED</strong> — the AI above can only recommend. Submitting a decision here is the only action that changes this alert's status, and requires an authorized investigator token.</div>
+      <h2>Investigator Decision</h2>
+      <div class="decision-row">
+        <select id="decisionSelect">
+          <option value="under_investigation">Under Investigation</option>
+          <option value="escalated">Escalated</option>
+          <option value="dismissed">Dismissed / False Positive</option>
+          <option value="confirmed_suspicious">Confirmed Suspicious</option>
+        </select>
+      </div>
+      <textarea id="decisionNotes" placeholder="Investigation notes (required for the audit trail)"></textarea>
+      <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+        <button class="decide" onclick="submitDecision('${alert.alert_id}')">Submit Final Decision</button>
+        <button class="secondary" onclick="verifyIntegrity()">Verify audit integrity</button>
+      </div>
+      <div id="decisionMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Audit Trail (append-only, tamper-evident)</h2>
+      ${auditHtml}
+    </div>
+  `;
+}
+
+function describeAuditEvent(event) {
+  switch (event.event_type) {
+    case 'alert_created': return `score ${event.anomaly_score}, severity ${event.severity}`;
+    case 'rules_triggered': return `rules: ${event.rule_ids.join(', ')}`;
+    case 'ai_context_sent': return event.context_summary;
+    case 'ai_recommendation_received': return `confidence ${event.confidence}, model available: ${event.model_available}`;
+    case 'investigator_decision': return `${event.investigator_id} → ${event.decision}: ${escapeHtml(event.notes)}`;
+    case 'status_changed': return `${event.from} → ${event.to}`;
+    default: return escapeHtml(event.message || '');
+  }
+}
+
+async function loadAiInvestigation(alertId) {
+  const el = document.getElementById('aiContent');
+  try {
+    const rec = await api(`/api/alerts/${alertId}/ai-investigation`);
+    el.innerHTML = `
+      <div class="ai-field"><span class="k">Summary</span>${escapeHtml(rec.summary)}</div>
+      <div class="ai-field"><span class="k">Suspicious signals</span>${rec.suspicious_signals.map(escapeHtml).join(', ') || '—'}</div>
+      <div class="ai-field"><span class="k">Relevant history context</span>${escapeHtml(rec.relevant_history_context)}</div>
+      <div class="ai-field"><span class="k">Risk assessment</span>${escapeHtml(rec.risk_assessment)}</div>
+      <div class="ai-field"><span class="k">Recommended next steps</span>
+        <ul>${rec.recommended_next_steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ul>
+      </div>
+      <div class="ai-field"><span class="k">Confidence: ${(rec.confidence * 100).toFixed(0)}% ${rec.model_available ? '' : '(AI unavailable — fallback response)'}</span>
+        <div class="confidence-bar"><div class="confidence-fill" style="width:${rec.confidence * 100}%"></div></div>
+      </div>
+      <div class="ai-field"><span class="k">Explanation</span>${escapeHtml(rec.explanation)}</div>
+    `;
+  } catch (e) {
+    el.innerHTML = `<div class="msg err">AI advisory unavailable: ${escapeHtml(JSON.stringify(e.body || e))}. Rules-based triage above is unaffected.</div>`;
+  }
+}
+
+async function submitDecision(alertId) {
+  const decision = document.getElementById('decisionSelect').value;
+  const notes = document.getElementById('decisionNotes').value;
+  const msgEl = document.getElementById('decisionMsg');
+  msgEl.innerHTML = '';
+  try {
+    await api(`/api/alerts/${alertId}/decision`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, notes }),
+    });
+    msgEl.innerHTML = '<div class="msg ok">Decision recorded. Reloading…</div>';
+    await loadAlerts();
+    selectAlert(alertId);
+  } catch (e) {
+    msgEl.innerHTML = `<div class="msg err">Failed: ${escapeHtml(JSON.stringify(e.body || e))}</div>`;
+  }
+}
+
+async function verifyIntegrity() {
+  try {
+    const result = await api('/api/audit/verify');
+    alert(result.intact ? 'Audit chain intact: no tampering detected.' : `INTEGRITY FAILURE: ${result.detail}`);
+  } catch (e) {
+    alert('Could not verify: ' + JSON.stringify(e.body || e));
+  }
+}
+
+loadAlerts();
+</script>
+
+</body>
+</html>
