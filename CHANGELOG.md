@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. Format loosely 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-15
+
 ### Added
 - Expanded `docs/` tree (architecture, Stellar/Soroban integration, AI boundary, human-in-the-loop, audit model, API reference, authorization, observability, configuration, persistence, testing strategy, security, threat model, runbook, data retention) plus architecture decision records under `docs/adr/`.
 - `stellartrace-storage` crate: optional JSON-file snapshot persistence for alerts and audit records.
