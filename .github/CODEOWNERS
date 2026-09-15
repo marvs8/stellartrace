@@ -1,0 +1,10 @@
+# Default owners for everything in the repo.
+# Replace with real team/usernames once the project has more than one maintainer.
+* @marvs8
+
+# The AI boundary and audit crates are the system's core compliance
+# guarantees — changes here deserve extra scrutiny.
+/crates/ai_advisor/ @marvs8
+/crates/audit/ @marvs8
+/crates/alerts/ @marvs8
+/contracts/ @marvs8
