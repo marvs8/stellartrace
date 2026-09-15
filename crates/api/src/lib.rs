@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod error;
 pub mod handlers;
+pub mod metrics;
 pub mod persistence;
 pub mod state;
 
@@ -15,6 +16,7 @@ use state::AppState;
 pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(handlers::health))
+        .route("/metrics", get(handlers::metrics))
         .route("/api/transactions", post(handlers::ingest_and_evaluate))
         .route("/api/transactions/:tx_hash", get(handlers::get_transaction))
         .route("/api/transactions/:tx_hash/evaluate", post(handlers::evaluate_transaction))
