@@ -109,6 +109,18 @@ impl AlertManager {
         self.list().into_iter().filter(|a| a.status == status).collect()
     }
 
+    /// Seeds the store with previously-persisted alerts, e.g. restored
+    /// from a `stellartrace-storage` snapshot at startup. Does not emit
+    /// audit events — the events for these alerts were already recorded
+    /// when they originally happened, and re-emitting them on every
+    /// restart would misrepresent the audit trail's timestamps.
+    pub fn restore(&self, alerts: Vec<Alert>) {
+        let mut store = self.alerts.write().unwrap();
+        for alert in alerts {
+            store.insert(alert.alert_id, alert);
+        }
+    }
+
     /// Any status is reachable from any non-terminal status; terminal
     /// statuses (`Dismissed`, `ConfirmedSuspicious`) can still be revised
     /// by a human (e.g. new evidence reopens a dismissed alert) — the
@@ -228,6 +240,19 @@ mod tests {
             decided_at: chrono::Utc::now(),
         };
         assert!(matches!(mgr.apply_investigator_decision(decision), Err(AlertError::NotFound(_))));
+    }
+
+    #[test]
+    fn restore_seeds_alerts_without_emitting_audit_events() {
+        let mgr = manager();
+        let mut alert = mgr.create_alert(&sample_tx(), vec![], 50.0, Severity::Medium);
+        alert.status = InvestigationStatus::Escalated;
+
+        let fresh_mgr = AlertManager::new(Arc::new(AuditLog::new()));
+        fresh_mgr.restore(vec![alert.clone()]);
+
+        assert_eq!(fresh_mgr.get(alert.alert_id).unwrap().status, InvestigationStatus::Escalated);
+        assert!(fresh_mgr.audit.for_alert(alert.alert_id).is_empty());
     }
 
     #[test]
