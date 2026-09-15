@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      STELLARTRACE_BIND_ADDR: "0.0.0.0:8080"
+      STELLARTRACE_API_TOKENS: "dev-investigator-token:investigator:dev,dev-admin-token:admin:dev-admin"
+      RUST_LOG: "info"
+      STELLARTRACE_RULES_CONFIG: "/app/config/default_rules.toml"
+      STELLARTRACE_DATA_DIR: "/data"
+      # ANTHROPIC_API_KEY: set this to enable the real AI advisor backend.
+    volumes:
+      - stellartrace-data:/data
+
+volumes:
+  stellartrace-data:
