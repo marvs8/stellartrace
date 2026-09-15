@@ -12,8 +12,10 @@ use stellartrace_common::{AiRecommendation, NormalizedTransaction};
 use stellartrace_rules_engine::{RulesConfig, RulesEngine};
 
 use crate::auth::AuthRegistry;
+use crate::metrics::Metrics;
 
 pub struct AppState {
+    pub metrics: Metrics,
     pub rules_engine: RulesEngine,
     pub rules_config: RwLock<RulesConfig>,
     pub alerts: Arc<AlertManager>,

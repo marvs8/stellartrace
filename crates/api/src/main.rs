@@ -53,6 +53,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let state = Arc::new(AppState {
+        metrics: stellartrace_api::metrics::Metrics::default(),
         rules_engine: RulesEngine::with_default_rules(),
         rules_config: RwLock::new(rules_config),
         alerts,
