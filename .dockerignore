@@ -1,0 +1,6 @@
+target
+contracts/*/target
+.git
+.env
+*.wasm
+dashboard/node_modules
