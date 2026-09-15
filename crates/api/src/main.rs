@@ -38,9 +38,23 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    let rules_config = match std::env::var("STELLARTRACE_RULES_CONFIG") {
+        Ok(path) => match stellartrace_rules_engine::config::load_from_file(&path) {
+            Ok(config) => {
+                tracing::info!(path, "loaded rules configuration from file");
+                config
+            }
+            Err(e) => {
+                tracing::warn!(path, error = %e, "failed to load rules configuration; using defaults");
+                RulesConfig::default()
+            }
+        },
+        Err(_) => RulesConfig::default(),
+    };
+
     let state = Arc::new(AppState {
         rules_engine: RulesEngine::with_default_rules(),
-        rules_config: RwLock::new(RulesConfig::default()),
+        rules_config: RwLock::new(rules_config),
         alerts,
         audit,
         advisor,
