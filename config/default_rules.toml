@@ -1,0 +1,38 @@
+# Sample StellarTrace rule threshold configuration.
+# Point STELLARTRACE_RULES_CONFIG at a copy of this file to override the
+# built-in defaults. Any field omitted here falls back to
+# RulesConfig::default() — see docs/configuration.md.
+
+# --- large_transfer ---
+large_transfer_threshold = 10000.0
+
+# --- repeated_transaction ---
+repeated_tx_window_secs = 60
+repeated_tx_count_threshold = 3
+
+# --- abnormal_frequency ---
+frequency_window_secs = 300
+frequency_count_threshold = 10
+
+# --- unusual_asset_movement ---
+unusual_asset_movement_multiplier = 5.0
+unusual_asset_min_history = 3
+
+# --- dormant_account_reactivation ---
+dormant_reactivation_gap_secs = 2592000    # 30 days
+dormant_reactivation_min_amount = 1000.0
+
+# --- round_trip_wash_trading ---
+wash_trading_window_secs = 3600
+
+# --- new_account_high_value_outflow ---
+new_account_history_threshold = 2
+new_account_outflow_threshold = 5000.0
+
+# --- cross_asset_rapid_conversion ---
+cross_asset_conversion_window_secs = 600
+cross_asset_conversion_count_threshold = 3
+
+# --- configurable_threshold ---
+[custom_thresholds]
+max_single_asset_exposure = 250000.0
