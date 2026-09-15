@@ -25,6 +25,7 @@ fn test_app() -> axum::Router {
     let audit = Arc::new(AuditLog::new());
     let alerts = Arc::new(AlertManager::new(audit.clone()));
     let state = Arc::new(AppState {
+        metrics: stellartrace_api::metrics::Metrics::default(),
         rules_engine: RulesEngine::with_default_rules(),
         rules_config: RwLock::new(RulesConfig::default()),
         alerts,
